@@ -18,6 +18,7 @@
 #include "error.h"
 #include "memory.h"
 #include "update.h"
+#include "domain.h"
 
 using namespace LAMMPS_NS;
 
@@ -100,6 +101,13 @@ void DumpXYZ::init_style()
   // open single file, one time only
 
   if (multifile == 0) openfile();
+
+  // setup header ptr
+  if (domain->triclinic == 0)
+      header_choice = &DumpXYZ::header_with_box;
+  else
+      error->all(FLERR,"Modified XYZ header doesn't work with triclinic cells");
+
 }
 
 /* ---------------------------------------------------------------------- */
@@ -131,7 +139,11 @@ int DumpXYZ::modify_param(int narg, char **arg)
   return 0;
 }
 
-/* ---------------------------------------------------------------------- */
+/* ----------------------------------------------------------------------
+   modified version of the XYZ header to print box dimensions
+   instead of current timestep
+  -----------------------------------------------------------------------
+ OLD HEADER
 
 void DumpXYZ::write_header(bigint n)
 {
@@ -139,6 +151,20 @@ void DumpXYZ::write_header(bigint n)
     fprintf(fp,BIGINT_FORMAT "\n",n);
     fprintf(fp,"Atoms. Timestep: " BIGINT_FORMAT "\n",update->ntimestep);
   }
+}
+*/
+void DumpXYZ::write_header(bigint n)
+{
+    if (me == 0) (this->*header_choice)(n);
+}
+
+void DumpXYZ::header_with_box(bigint n)
+{
+    double boxx = (domain->boxhi[0])-(domain->boxlo[0]);
+    double boxy = (domain->boxhi[1])-(domain->boxlo[1]);
+    double boxz = (domain->boxhi[2])-(domain->boxlo[2]);
+    fprintf(fp,BIGINT_FORMAT "\n",n);
+    fprintf(fp,"%-1.6f %-1.6f %-1.6f\n",boxx,boxy,boxz);
 }
 
 /* ---------------------------------------------------------------------- */

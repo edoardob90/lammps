@@ -44,6 +44,10 @@ class DumpXYZ : public Dump {
   FnPtrWrite write_choice;              // ptr to write data functions
   void write_string(int, double *);
   void write_lines(int, double *);
+
+  typedef void (DumpXYZ::*FnPtrHeader)(bigint);
+  FnPtrHeader header_choice;
+  void header_with_box(bigint);
 };
 
 }
