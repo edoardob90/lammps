@@ -23,7 +23,7 @@ PairStyle(runner, PairRuNNer)
 #include "pair.h"
 //#include <unordered_map>
 
-#define MAXNEIGH 192                                            // maximum number of neighbors for neighbor list
+#define MAXNEIGH 500                                            // maximum number of neighbors for neighbor list
 #define LLINE 256                                               // maximum number of characters per line
 #define MPITAG_STD 0                                            // macro for standard MPI message tag
 #define CONST_A2B 1.8897261328                                  // conversion factor Angstrom to Bohr
