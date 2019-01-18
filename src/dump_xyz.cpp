@@ -49,6 +49,9 @@ DumpXYZ::DumpXYZ(LAMMPS *lmp, int narg, char **arg) : Dump(lmp, narg, arg),
 
   ntypes = atom->ntypes;
   typenames = NULL;
+
+  // unwrap flag default value = wrap coordinates
+  unwrap_flag = 0;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -136,6 +139,14 @@ int DumpXYZ::modify_param(int narg, char **arg)
     return ntypes+1;
   }
 
+  if (strcmp(arg[0],"unwrap") == 0) {
+    if (narg < 2) error->all(FLERR,"Illegal dump_modify command");
+    if (strcmp(arg[1],"yes") == 0) unwrap_flag = 1;
+    else if (strcmp(arg[1],"no") == 0) unwrap_flag = 0;
+    else error->all(FLERR,"Illegal dump_modify command");
+    return 2;
+  }
+
   return 0;
 }
 
@@ -180,6 +191,36 @@ void DumpXYZ::pack(tagint *ids)
   int nlocal = atom->nlocal;
 
   m = n = 0;
+  if (unwrap_flag) {
+    double xprd = domain->xprd;
+    double yprd = domain->yprd;
+    double zprd = domain->zprd;
+    double xy = domain->xy;
+    double xz = domain->xz;
+    double yz = domain->yz;
+
+    for (int i = 0; i < nlocal; ++i) {
+        if (mask[i] & groupbit) {
+
+        int ix = (image[i] & IMGMASK) - IMGMAX;
+        int iy = (image[i] >> IMGBITS & IMGMASK) - IMGMAX;
+        int iz = (image[i] >> IMG2BITS) - IMGMAX;
+
+            buf[m++] = tag[i];
+            buf[m++] = type[i];
+            if (domain->triclinic) {
+                buf[m++] = x[i][0] + ix * xprd + iy * xy + iz * xz;
+                buf[m++] = x[i][1] + iy * yprd + iz * yz;
+                buf[m++] = x[i][2] + iz * zprd;
+            } else {
+                buf[m++] = x[i][0] + ix * xprd;
+                buf[m++] = x[i][1] + iy * yprd;
+                buf[m++] = x[i][2] + iz * zprd;
+            }
+            if (ids) ids[n++] = tag[i];
+        }
+    }
+  } else {
   for (int i = 0; i < nlocal; i++)
     if (mask[i] & groupbit) {
       buf[m++] = tag[i];
@@ -189,6 +230,7 @@ void DumpXYZ::pack(tagint *ids)
       buf[m++] = x[i][2];
       if (ids) ids[n++] = tag[i];
     }
+  }
 }
 
 

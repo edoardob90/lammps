@@ -48,6 +48,8 @@ class DumpXYZ : public Dump {
   typedef void (DumpXYZ::*FnPtrHeader)(bigint);
   FnPtrHeader header_choice;
   void header_with_box(bigint);
+
+  int unwrap_flag; // 1 = coords uwrapped; 0 = coords wrapped
 };
 
 }
