@@ -18,6 +18,7 @@
 #include "error.h"
 #include "memory.h"
 #include "update.h"
+#include "domain.h"
 
 using namespace LAMMPS_NS;
 
@@ -48,6 +49,9 @@ DumpXYZ::DumpXYZ(LAMMPS *lmp, int narg, char **arg) : Dump(lmp, narg, arg),
 
   ntypes = atom->ntypes;
   typenames = NULL;
+
+  // unwrap flag default value = wrap coordinates
+  unwrap_flag = 0;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -100,6 +104,13 @@ void DumpXYZ::init_style()
   // open single file, one time only
 
   if (multifile == 0) openfile();
+
+  // setup header ptr
+  if (domain->triclinic == 0)
+      header_choice = &DumpXYZ::header_with_box;
+  else
+      error->all(FLERR,"Modified XYZ header doesn't work with triclinic cells");
+
 }
 
 /* ---------------------------------------------------------------------- */
@@ -128,10 +139,22 @@ int DumpXYZ::modify_param(int narg, char **arg)
     return ntypes+1;
   }
 
+  if (strcmp(arg[0],"unwrap") == 0) {
+    if (narg < 2) error->all(FLERR,"Illegal dump_modify command");
+    if (strcmp(arg[1],"yes") == 0) unwrap_flag = 1;
+    else if (strcmp(arg[1],"no") == 0) unwrap_flag = 0;
+    else error->all(FLERR,"Illegal dump_modify command");
+    return 2;
+  }
+
   return 0;
 }
 
-/* ---------------------------------------------------------------------- */
+/* ----------------------------------------------------------------------
+   modified version of the XYZ header to print box dimensions
+   instead of current timestep
+  -----------------------------------------------------------------------
+ OLD HEADER
 
 void DumpXYZ::write_header(bigint n)
 {
@@ -139,6 +162,20 @@ void DumpXYZ::write_header(bigint n)
     fprintf(fp,BIGINT_FORMAT "\n",n);
     fprintf(fp,"Atoms. Timestep: " BIGINT_FORMAT "\n",update->ntimestep);
   }
+}
+*/
+void DumpXYZ::write_header(bigint n)
+{
+    if (me == 0) (this->*header_choice)(n);
+}
+
+void DumpXYZ::header_with_box(bigint n)
+{
+    double boxx = (domain->boxhi[0])-(domain->boxlo[0]);
+    double boxy = (domain->boxhi[1])-(domain->boxlo[1]);
+    double boxz = (domain->boxhi[2])-(domain->boxlo[2]);
+    fprintf(fp,BIGINT_FORMAT "\n",n);
+    fprintf(fp,"%-1.6f %-1.6f %-1.6f\n",boxx,boxy,boxz);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -152,8 +189,39 @@ void DumpXYZ::pack(tagint *ids)
   int *mask = atom->mask;
   double **x = atom->x;
   int nlocal = atom->nlocal;
+  imageint *image = atom->image;
 
   m = n = 0;
+  if (unwrap_flag) {
+    double xprd = domain->xprd;
+    double yprd = domain->yprd;
+    double zprd = domain->zprd;
+    double xy = domain->xy;
+    double xz = domain->xz;
+    double yz = domain->yz;
+
+    for (int i = 0; i < nlocal; ++i) {
+        if (mask[i] & groupbit) {
+
+        int ix = (image[i] & IMGMASK) - IMGMAX;
+        int iy = (image[i] >> IMGBITS & IMGMASK) - IMGMAX;
+        int iz = (image[i] >> IMG2BITS) - IMGMAX;
+
+            buf[m++] = tag[i];
+            buf[m++] = type[i];
+            if (domain->triclinic) {
+                buf[m++] = x[i][0] + ix * xprd + iy * xy + iz * xz;
+                buf[m++] = x[i][1] + iy * yprd + iz * yz;
+                buf[m++] = x[i][2] + iz * zprd;
+            } else {
+                buf[m++] = x[i][0] + ix * xprd;
+                buf[m++] = x[i][1] + iy * yprd;
+                buf[m++] = x[i][2] + iz * zprd;
+            }
+            if (ids) ids[n++] = tag[i];
+        }
+    }
+  } else {
   for (int i = 0; i < nlocal; i++)
     if (mask[i] & groupbit) {
       buf[m++] = tag[i];
@@ -163,6 +231,7 @@ void DumpXYZ::pack(tagint *ids)
       buf[m++] = x[i][2];
       if (ids) ids[n++] = tag[i];
     }
+  }
 }
 
 
