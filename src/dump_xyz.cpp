@@ -189,6 +189,7 @@ void DumpXYZ::pack(tagint *ids)
   int *mask = atom->mask;
   double **x = atom->x;
   int nlocal = atom->nlocal;
+  imageint *image = atom->image;
 
   m = n = 0;
   if (unwrap_flag) {
